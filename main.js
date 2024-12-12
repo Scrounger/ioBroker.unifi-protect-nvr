@@ -576,7 +576,7 @@ class UnifiProtectNvr extends utils.Adapter {
 			// motion events consist multiple events
 			if (this.ufp) {
 				// ToDo: log level silly
-				this.log.debug(`${this.ufp.getDeviceName(cam)} - eventId: ${header.id}, payload: ${JSON.stringify(payload)}`);
+				this.log.debug(`${logPrefix} ${this.ufp.getDeviceName(cam)} - eventId: ${header.id}, payload: ${JSON.stringify(payload)}`);
 
 				if (payload.type === 'motion' || payload.type === 'smartDetectZone' || payload.type === 'smartDetectLine' || this.eventStore.cameras[header.id]) {
 					const camMac = `cameras.${cam.mac}`;
@@ -601,18 +601,18 @@ class UnifiProtectNvr extends utils.Adapter {
 						};
 
 						// set custom states - using eventStore because conversions may be defined here
-						this.setCustomMotionEventStates('cameras', cam, this.eventStore.cameras[header.id]);
+						await this.setCustomMotionEventStates('cameras', cam, this.eventStore.cameras[header.id]);
 
 						if (this.config.motionEventsHistoryEnabled) {
-							this.setCustomMotionEventStates('events.motion', cam, this.eventStore.cameras[header.id], true, true);
+							await this.setCustomMotionEventStates('events.motion', cam, this.eventStore.cameras[header.id], true, true);
 						}
 
 						// Snapshot Delay configured
 						if (this.config.motionSnapshot && this.config.motionSnapshotDelay >= 0 && !this.eventStore.cameras[header.id].snapshotTaken) {
-							setTimeout(() => {
+							setTimeout(async () => {
 								delete this.eventStore.cameras[header.id].lastMotionSnapshot;	// delete from object to prevent override with default image
 
-								this.getSnapshot(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionSnapshot.id}`, this.config.motionSnapshotWidth, this.config.motionSnapshotHeight, true,
+								await this.getSnapshot(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionSnapshot.id}`, this.config.motionSnapshotWidth, this.config.motionSnapshotHeight, true,
 									this.config.motionEventsHistoryEnabled, `events.motion.${header.id}.${myDeviceTypes.cameras.lastMotionSnapshot.id.replace('lastMotion.', '')}`);
 								this.eventStore.cameras[header.id].snapshotTaken = true;
 
@@ -629,7 +629,7 @@ class UnifiProtectNvr extends utils.Adapter {
 							if (this.config.motionSnapshot && this.config.motionSnapshotDelay === -1 && !this.eventStore.cameras[header.id].snapshotTaken) {
 								delete this.eventStore.cameras[header.id].lastMotionSnapshot;	// delete from object to prevent override with default image
 
-								this.getSnapshot(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionSnapshot.id}`, this.config.motionSnapshotWidth, this.config.motionSnapshotHeight, true,
+								await this.getSnapshot(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionSnapshot.id}`, this.config.motionSnapshotWidth, this.config.motionSnapshotHeight, true,
 									this.config.motionEventsHistoryEnabled, `events.motion.${header.id}.${myDeviceTypes.cameras.lastMotionSnapshot.id.replace('lastMotion.', '')}`);
 								this.eventStore.cameras[header.id].snapshotTaken = true;
 
@@ -640,24 +640,26 @@ class UnifiProtectNvr extends utils.Adapter {
 								this.log.debug(`${logPrefix} ${this.ufp.getDeviceName(cam)} - motion event finished (eventStore: ${JSON.stringify(this.eventStore.cameras[header.id])})`);
 
 								// set custom states - using eventStore because conversions may be defined here
-								this.setCustomMotionEventStates('cameras', cam, this.eventStore.cameras[header.id], true);
+								await this.setCustomMotionEventStates('cameras', cam, this.eventStore.cameras[header.id], true);
 
 								if (this.config.motionThumb) {
 									delete this.eventStore.cameras[header.id].lastMotionThumbnail;	// delete from object to prevent override with default image
 
-									this.getEventThumb(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionThumbnail.id}`, header.id, this.config.motionThumbWidth, this.config.motionThumbHeight,
+									await this.getEventThumb(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionThumbnail.id}`, header.id, this.config.motionThumbWidth, this.config.motionThumbHeight,
 										this.config.motionEventsHistoryEnabled, `events.motion.${header.id}.${myDeviceTypes.cameras.lastMotionThumbnail.id.replace('lastMotion.', '')}`);
 								}
 
 								if (this.config.motionThumbAnimated) {
 									delete this.eventStore.cameras[header.id].lastMotionThumbnailAnimated;	// delete from object to prevent override with default image
 
-									this.getEventAnimatedThumb(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionThumbnailAnimated.id}`, header.id, this.config.motionThumbAnimatedWidth, this.config.motionThumbAnimatedHeight, this.config.motionThumbAnimatedSpeedUp,
-										this.config.motionEventsHistoryEnabled, `events.motion.${header.id}.${myDeviceTypes.cameras.lastMotionThumbnailAnimated.id.replace('lastMotion.', '')}`);
+									this.setTimeout(async () => {
+										await this.getEventAnimatedThumb(cam, `${camMac}.${myDeviceTypes.cameras.lastMotionThumbnailAnimated.id}`, header.id, this.config.motionThumbAnimatedWidth, this.config.motionThumbAnimatedHeight, this.config.motionThumbAnimatedSpeedUp,
+											this.config.motionEventsHistoryEnabled, `events.motion.${header.id}.${myDeviceTypes.cameras.lastMotionThumbnailAnimated.id.replace('lastMotion.', '')}`);
+									}, 5 * 1000);
 								}
 
 								if (this.config.motionEventsHistoryEnabled) {
-									this.setCustomMotionEventStates('events.motion', cam, this.eventStore.cameras[header.id], true, true);
+									await this.setCustomMotionEventStates('events.motion', cam, this.eventStore.cameras[header.id], true, true);
 								}
 
 								delete this.eventStore.cameras[header.id];
@@ -703,10 +705,10 @@ class UnifiProtectNvr extends utils.Adapter {
 
 						this.log.debug(`${logPrefix} thumb successfully stored in state '.${targetId.split('.')?.slice(1)?.join('.')}'`);
 
-						this.setStateExists(targetId, base64ImgString);
+						await this.setStateExists(targetId, base64ImgString);
 
 						if (isHistorieEnabled && historyId) {
-							this.setStateExists(historyId, base64ImgString);
+							await this.setStateExists(historyId, base64ImgString);
 							this.log.debug(`${logPrefix} thumb successfully stored in state '.${historyId.split('.')?.slice(1)?.join('.')}'`);
 						}
 					} else {
@@ -749,10 +751,10 @@ class UnifiProtectNvr extends utils.Adapter {
 
 						this.log.debug(`${logPrefix} animated thumb successfully stored in state '.${targetId.split('.')?.slice(1)?.join('.')}'`);
 
-						this.setStateExists(targetId, base64ImgString);
+						await this.setStateExists(targetId, base64ImgString);
 
 						if (isHistorieEnabled && historyId) {
-							this.setStateExists(historyId, base64ImgString);
+							await this.setStateExists(historyId, base64ImgString);
 							this.log.debug(`${logPrefix} animated thumb successfully stored in state '.${historyId.split('.')?.slice(1)?.join('.')}'`);
 						}
 					} else {
@@ -792,10 +794,10 @@ class UnifiProtectNvr extends utils.Adapter {
 
 						this.log.debug(`${logPrefix} snapshot successfully stored in state '.${targetId.split('.')?.slice(1)?.join('.')}'`);
 
-						this.setStateExists(targetId, base64ImgString);
+						await this.setStateExists(targetId, base64ImgString);
 
 						if (isHistorieEnabled && historyId) {
-							this.setStateExists(historyId, base64ImgString);
+							await this.setStateExists(historyId, base64ImgString);
 							this.log.debug(`${logPrefix} snapshot successfully stored in state '.${historyId.split('.')?.slice(1)?.join('.')}'`);
 						}
 					} else {
